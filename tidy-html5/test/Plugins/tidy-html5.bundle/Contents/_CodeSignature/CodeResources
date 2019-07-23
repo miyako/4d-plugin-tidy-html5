@@ -13,6 +13,10 @@
 			<key>optional</key>
 			<true/>
 		</dict>
+		<key>Resources/LICENSE</key>
+		<data>
+		JasvUTkcJy/sE5YGezYQ/FVWOFM=
+		</data>
 		<key>Resources/constants.xlf</key>
 		<data>
 		nIPLkLK7658AK+eA/dIpL1hMjrA=
@@ -43,6 +47,17 @@
 			</data>
 			<key>optional</key>
 			<true/>
+		</dict>
+		<key>Resources/LICENSE</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			JasvUTkcJy/sE5YGezYQ/FVWOFM=
+			</data>
+			<key>hash2</key>
+			<data>
+			59C+B1vG8EJuOCrnFbD51FsW6L8B4hbuKdFBhMPORkM=
+			</data>
 		</dict>
 		<key>Resources/constants.xlf</key>
 		<dict>
