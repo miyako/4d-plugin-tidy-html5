@@ -74,29 +74,29 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			hL9gqzB1pAgChKZ1uj+Jqt43yxs=
+			SOEpBIUOAWQ3QAy8VbwbG8c271E=
 			</data>
 			<key>hash2</key>
 			<data>
-			ZCCEqtPmUM+2iJDxTvuZrd5mchV7dH5Z4RZvNF7YQT0=
+			yEeLF3Vn1JSps6ty8Qc60qUmgFewIKYJQDk45uPxHmA=
 			</data>
 		</dict>
 		<key>Windows64/tidy-html5.4DX</key>
 		<dict>
 			<key>hash</key>
 			<data>
-			zvoZ7ULt+O/aKx6NzgaqTillGNg=
+			9sG98R7xFDqkM1QtJjjTQ+SuhVU=
 			</data>
 			<key>hash2</key>
 			<data>
-			xZ0isPdvytfz/ISMhvmTet0RKxwRCg6HeDepN7N2icI=
+			QMTfC0ZARRXOneIzGAwkk+GGpHeoBUq/AXBjGl0ZlCA=
 			</data>
 		</dict>
 		<key>manifest.json</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			g97yCGDDiK2WJjYMVnQ93DmgXF4=
+			IHy295YFteOOyQSft60dZQcUw80=
 			</data>
 			<key>requirement</key>
 			<string>identifier manifest and anchor apple generic and certificate leaf[subject.CN] = "Mac Developer: keisuke miyako (4W9UT59D3B)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
