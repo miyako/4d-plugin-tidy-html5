@@ -8,7 +8,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			KBZiHxAiQb4iH60kcIuF5VrhKFg=
+			o/4Fvc2fysc3hEPT7pFpEBGNTEo=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -26,10 +26,6 @@
 	<dict>
 		<key>QuickLook/Thumbnail.png</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			hC+U8EqvyIRM1lLakHLfvl4V9Tc=
-			</data>
 			<key>hash2</key>
 			<data>
 			nGfrvibB5KlzvZgF4Bra+l0HpRloxismgTLePnOwCdk=
@@ -37,23 +33,15 @@
 		</dict>
 		<key>Resources/English.lproj/InfoPlist.strings</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			KBZiHxAiQb4iH60kcIuF5VrhKFg=
-			</data>
 			<key>hash2</key>
 			<data>
-			hAJOyRwGyI/C4ODU2YVjVHla+zukHdbvxMneBnEWP4w=
+			MMdOtK4Ak9Y4iVklaqqQmrZwvHLzjN/tIQ+PYcr6sCU=
 			</data>
 			<key>optional</key>
 			<true/>
 		</dict>
 		<key>Resources/LICENSE</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			JasvUTkcJy/sE5YGezYQ/FVWOFM=
-			</data>
 			<key>hash2</key>
 			<data>
 			59C+B1vG8EJuOCrnFbD51FsW6L8B4hbuKdFBhMPORkM=
@@ -61,10 +49,6 @@
 		</dict>
 		<key>Resources/constants.xlf</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			nIPLkLK7658AK+eA/dIpL1hMjrA=
-			</data>
 			<key>hash2</key>
 			<data>
 			GjwmCRDhaShX3xfn35YAm+jbuDnm9uvG4sp4hfYKxsk=
@@ -72,10 +56,6 @@
 		</dict>
 		<key>Windows/tidy-html5.4DX</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			SOEpBIUOAWQ3QAy8VbwbG8c271E=
-			</data>
 			<key>hash2</key>
 			<data>
 			yEeLF3Vn1JSps6ty8Qc60qUmgFewIKYJQDk45uPxHmA=
@@ -83,10 +63,6 @@
 		</dict>
 		<key>Windows64/tidy-html5.4DX</key>
 		<dict>
-			<key>hash</key>
-			<data>
-			9sG98R7xFDqkM1QtJjjTQ+SuhVU=
-			</data>
 			<key>hash2</key>
 			<data>
 			QMTfC0ZARRXOneIzGAwkk+GGpHeoBUq/AXBjGl0ZlCA=
@@ -96,10 +72,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			IHy295YFteOOyQSft60dZQcUw80=
+			3HgNigVo5nmywGPjT9trwXgaCWs=
 			</data>
 			<key>requirement</key>
-			<string>identifier manifest and anchor apple generic and certificate leaf[subject.CN] = "Mac Developer: keisuke miyako (4W9UT59D3B)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
+			<string>identifier manifest and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = Y69CWUC25B</string>
 		</dict>
 	</dict>
 	<key>rules</key>
