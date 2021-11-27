@@ -1,5 +1,5 @@
 # 4d-plugin-tidy-html5
-4D implementation of [tidy](https://github.com/htacg/tidy-html5)
+4D implementation of [tidy-html5](https://github.com/htacg/tidy-html5).
 
 ![version](https://img.shields.io/badge/version-18%2B-EB8E5F)
 ![platform](https://img.shields.io/static/v1?label=platform&message=mac-intel%20|%20mac-arm%20|%20win-64&color=blue)
