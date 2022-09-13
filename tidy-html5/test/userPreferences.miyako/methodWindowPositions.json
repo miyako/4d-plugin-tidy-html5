@@ -1,4 +1,4 @@
-﻿{
+{
 	"Sources/DatabaseMethods/onStartup.4dm": {
 		"left": 322,
 		"top": 651,
@@ -162,15 +162,15 @@
 		"height": 761
 	},
 	"Sources/Methods/TEST_02.4dm": {
-		"left": 382,
+		"left": 526,
 		"top": 231,
 		"width": 1129,
 		"height": 761
 	},
 	"Sources/Methods/parse_href.4dm": {
-		"left": 382,
-		"top": 205,
+		"left": 526,
+		"top": 203,
 		"width": 1129,
-		"height": 787
+		"height": 789
 	}
 }
