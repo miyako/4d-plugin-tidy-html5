@@ -18,6 +18,9 @@
 		D130064F12F02D9700702C0E /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D130064E12F02D9700702C0E /* Cocoa.framework */; };
 		D13116A91A03ACB700DE1322 /* 4DPluginAPI.c in Sources */ = {isa = PBXBuildFile; fileRef = D13116A81A03ACB700DE1322 /* 4DPluginAPI.c */; settings = {COMPILER_FLAGS = "-Wno-multichar"; }; };
 		D134D4AC1A030BA0008D14EF /* manifest.json in CopyFiles */ = {isa = PBXBuildFile; fileRef = D134D4A91A030B06008D14EF /* manifest.json */; };
+		D157E10D2E596AD20030B06F /* C_TEXT.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D157E10B2E596AD20030B06F /* C_TEXT.cpp */; };
+		D157E10E2E596AD20030B06F /* C_TEXT.h in Headers */ = {isa = PBXBuildFile; fileRef = D157E10A2E596AD20030B06F /* C_TEXT.h */; };
+		D157E10F2E596AD20030B06F /* C_TYPES.h in Headers */ = {isa = PBXBuildFile; fileRef = D157E10C2E596AD20030B06F /* C_TYPES.h */; };
 		D16045F922E7009800EC7FF0 /* 4DPlugin-JSON.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D16045F722E7009800EC7FF0 /* 4DPlugin-JSON.cpp */; };
 		D16045FA22E7009800EC7FF0 /* 4DPlugin-JSON.h in Headers */ = {isa = PBXBuildFile; fileRef = D16045F822E7009800EC7FF0 /* 4DPlugin-JSON.h */; };
 		D16F9E1E27527BA600D21E58 /* libtidy.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D16F9E1D27527BA600D21E58 /* libtidy.a */; };
@@ -51,6 +54,9 @@
 		D13116A81A03ACB700DE1322 /* 4DPluginAPI.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; path = 4DPluginAPI.c; sourceTree = "<group>"; };
 		D134D4A91A030B06008D14EF /* manifest.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = manifest.json; sourceTree = "<group>"; };
 		D14D10DD1A03A8A5008B3411 /* constants.xlf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = constants.xlf; sourceTree = "<group>"; };
+		D157E10A2E596AD20030B06F /* C_TEXT.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = C_TEXT.h; path = "4D Plugin API/Classes/C_TEXT.h"; sourceTree = "<group>"; };
+		D157E10B2E596AD20030B06F /* C_TEXT.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; name = C_TEXT.cpp; path = "4D Plugin API/Classes/C_TEXT.cpp"; sourceTree = "<group>"; };
+		D157E10C2E596AD20030B06F /* C_TYPES.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = C_TYPES.h; path = "4D Plugin API/Classes/C_TYPES.h"; sourceTree = "<group>"; };
 		D16045F722E7009800EC7FF0 /* 4DPlugin-JSON.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.objcpp; fileEncoding = 4; name = "4DPlugin-JSON.cpp"; path = "support/4DPlugin-JSON.cpp"; sourceTree = "<group>"; };
 		D16045F822E7009800EC7FF0 /* 4DPlugin-JSON.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "4DPlugin-JSON.h"; path = "support/4DPlugin-JSON.h"; sourceTree = "<group>"; };
 		D16F9E1D27527BA600D21E58 /* libtidy.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtidy.a; path = a/libtidy.a; sourceTree = "<group>"; };
@@ -74,6 +80,9 @@
 			children = (
 				D16045F722E7009800EC7FF0 /* 4DPlugin-JSON.cpp */,
 				D16045F822E7009800EC7FF0 /* 4DPlugin-JSON.h */,
+				D157E10A2E596AD20030B06F /* C_TEXT.h */,
+				D157E10B2E596AD20030B06F /* C_TEXT.cpp */,
+				D157E10C2E596AD20030B06F /* C_TYPES.h */,
 				D108BD7A1A03D1E6001F1B90 /* Manifest */,
 				08FB77ADFE841716C02AAC07 /* Source */,
 				089C167CFE841241C02AAC07 /* Resources */,
@@ -159,6 +168,8 @@
 				18B684F706944F2000CC6A1E /* 4DPluginAPI.h in Headers */,
 				18B684F806944F2000CC6A1E /* EntryPoints.h in Headers */,
 				18B684F906944F2000CC6A1E /* Flags.h in Headers */,
+				D157E10E2E596AD20030B06F /* C_TEXT.h in Headers */,
+				D157E10F2E596AD20030B06F /* C_TYPES.h in Headers */,
 				18B684FA06944F2000CC6A1E /* PrivateTypes.h in Headers */,
 				18B684FB06944F2000CC6A1E /* PublicTypes.h in Headers */,
 				D120937F13534DCC00A72CAA /* 4DPlugin-tidy-html5.h in Headers */,
@@ -258,7 +269,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if test \"$CONFIGURATION\" == 'Deployment'; then\n\n    USER_NAME=keisuke.miyako@4d.com\n    UUID=`uuidgen | tr -d - | tr -d '\\n' | tr '[:upper:]' '[:lower:]'`\n    DEVELOPER_ID=`security find-identity -p codesigning -v | egrep 'Developer ID Application[^\"]+' -o`\n    PRODUCT_PATH=\"$CODESIGNING_FOLDER_PATH\"\n    \n    #clean\n    xattr -cr \"$PRODUCT_PATH\"\n    codesign --remove-signature \"$PRODUCT_PATH\"\n    \n    #sign\n    codesign --verbose --deep --timestamp --force --sign \"$DEVELOPER_ID\" \"$PRODUCT_PATH\"\n    \n    #archive\n    DMG_PATH=\"$PROJECT_DIR/$PRODUCT_NAME.dmg\"\n    ZIP_PATH=\"$PROJECT_DIR/$PRODUCT_NAME.zip\" #for windows\n    rm -f \"$DMG_PATH\"\n    hdiutil create -format UDBZ -plist -srcfolder \"$PRODUCT_PATH\" \"$DMG_PATH\"\n    rm -f \"$ZIP_PATH\"\n    ditto -c -k --keepParent \"$PRODUCT_PATH\" \"$ZIP_PATH\"\n    \n    xcrun notarytool submit \"$ZIP_PATH\" --keychain-profile \"notarytool\" --wait\n    xcrun notarytool submit \"$DMG_PATH\" --keychain-profile \"notarytool\" --wait\n        \n    xcrun stapler staple \"$DMG_PATH\"\n\nelse\n    echo \"No notarization performed as this is not a release build.\"\nfi\n";
+			shellScript = "if test \"$CONFIGURATION\" == 'Deployment'; then\n\n    USER_NAME=keisuke.miyako@4d.com\n    UUID=`uuidgen | tr -d - | tr -d '\\n' | tr '[:upper:]' '[:lower:]'`\n    DEVELOPER_ID=`security find-identity -p codesigning -v | egrep 'Developer ID Application[^\"]+' -o`\n    PRODUCT_PATH=\"$CODESIGNING_FOLDER_PATH\"\n    \n    #clean\n    xattr -cr \"$PRODUCT_PATH\"\n    codesign --remove-signature \"$PRODUCT_PATH\"\n    \n    #sign\n    codesign --verbose --deep --timestamp --force --sign \"Developer ID Application: keisuke miyako (Y69CWUC25B)\" \"$PRODUCT_PATH\"\n    \n    #archive\n    DMG_PATH=\"$PROJECT_DIR/$PRODUCT_NAME.dmg\"\n    ZIP_PATH=\"$PROJECT_DIR/$PRODUCT_NAME.zip\" #for windows\n    rm -f \"$DMG_PATH\"\n    hdiutil create -format UDBZ -plist -srcfolder \"$PRODUCT_PATH\" \"$DMG_PATH\"\n    rm -f \"$ZIP_PATH\"\n    ditto -c -k --keepParent \"$PRODUCT_PATH\" \"$ZIP_PATH\"\n    \n    xcrun notarytool submit \"$ZIP_PATH\" --keychain-profile \"notarytool\" --wait\n    xcrun notarytool submit \"$DMG_PATH\" --keychain-profile \"notarytool\" --wait\n        \n    xcrun stapler staple \"$DMG_PATH\"\n\nelse\n    echo \"No notarization performed as this is not a release build.\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -269,6 +280,7 @@
 			files = (
 				18B684FF06944F8800CC6A1E /* 4DPlugin-tidy-html5.cpp in Sources */,
 				D16045F922E7009800EC7FF0 /* 4DPlugin-JSON.cpp in Sources */,
+				D157E10D2E596AD20030B06F /* C_TEXT.cpp in Sources */,
 				D13116A91A03ACB700DE1322 /* 4DPluginAPI.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

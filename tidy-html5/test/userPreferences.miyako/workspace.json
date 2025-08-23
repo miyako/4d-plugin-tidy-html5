@@ -1,24 +1,6 @@
 {
 	"editors": [
 		{
-			"type": "method",
-			"id": 2147483645,
-			"previousTabType": "method",
-			"previousTabID": 2147483646,
-			"codeDescriptor": {
-				"type": 1,
-				"methodName": "parse_href"
-			}
-		},
-		{
-			"type": "method",
-			"id": 2147483646,
-			"codeDescriptor": {
-				"type": 1,
-				"methodName": "TEST_02"
-			}
-		},
-		{
 			"type": "explorer"
 		}
 	]
