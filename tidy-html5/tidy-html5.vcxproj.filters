@@ -6,6 +6,7 @@
     </ClCompile>
     <ClCompile Include="4DPlugin-tidy-html5.cpp" />
     <ClCompile Include="support\4DPlugin-JSON.cpp" />
+    <ClCompile Include="4D Plugin API\Classes\C_TEXT.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="4D Plugin API\4DPluginAPI.h">
@@ -25,6 +26,8 @@
     </ClInclude>
     <ClInclude Include="4DPlugin-tidy-html5.h" />
     <ClInclude Include="support\4DPlugin-JSON.h" />
+    <ClInclude Include="4D Plugin API\Classes\C_TEXT.h" />
+    <ClInclude Include="4D Plugin API\Classes\C_TYPES.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="4D Plugin API">
