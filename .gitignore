@@ -1,1 +1,6 @@
 tidy-html5/build/*
+tidy-html5/Objs/*
+tidy-html5/.vs/*
+tidy-html5/test/Plugins/tidy-html5.bundle/Contents/Windows64/tidy-html5.lib
+tidy-html5/test/Plugins/tidy-html5.bundle/Contents/Windows64/tidy-html5.exp
+tidy-html5/出力-ビルド.txt
