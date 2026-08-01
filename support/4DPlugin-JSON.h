@@ -30,6 +30,19 @@
 #include <time.h>
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
+
+// Undefine immediately: `close`/`TickCount` above are BSD-compatibility
+// renames for whatever networking/ICMP code elsewhere expects those names.
+// Leaving them defined for the rest of this header's lifetime pollutes
+// every other translation unit that includes 4DPlugin-JSON.h -- e.g. it
+// would silently rewrite std::fstream::close() into std::fstream::closesocket(),
+// which either fails to compile far from the real cause or compiles into
+// the wrong call if a matching member ever exists. Nothing in this header
+// or its .cpp needs these names past this point. If other files in the
+// project rely on this renaming, they should #define it locally right
+// before the code that needs it instead of depending on this header.
+#undef close
+#undef TickCount
 #else
 #include <sys/types.h>
 #include <sys/socket.h>

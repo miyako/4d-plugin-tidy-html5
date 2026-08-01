@@ -41,7 +41,7 @@ void ob_set_p(PA_ObjectRef obj, const wchar_t *_key, PA_Picture value) {
 
 void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
 
-    if(obj)
+    if(obj && _key && _value)
     {
         CUTF8String u8k = CUTF8String((const uint8_t *)_key);
         CUTF8String u8v = CUTF8String((const uint8_t *)_value);
@@ -52,7 +52,7 @@ void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
         if(len){
             std::vector<uint8_t> buf((len + 1) * sizeof(PA_Unichar));
             if(MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)u8k.c_str(), u8k.length(), (LPWSTR)&buf[0], len)){
-                u16k = CUTF16String((const PA_Unichar *)&buf[0]);
+                u16k = CUTF16String((const PA_Unichar *)&buf[0], (size_t)len);
             }
         }
         u8v = CUTF8String((const uint8_t *)_value);
@@ -60,7 +60,7 @@ void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
         if(len){
             std::vector<uint8_t> buf((len + 1) * sizeof(PA_Unichar));
             if(MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)u8v.c_str(), u8v.length(), (LPWSTR)&buf[0], len)){
-                u16v = CUTF16String((const PA_Unichar *)&buf[0]);
+                u16v = CUTF16String((const PA_Unichar *)&buf[0], (size_t)len);
             }
         }
 #else
@@ -70,7 +70,7 @@ void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
             CFIndex len = CFStringGetLength(str);
             std::vector<uint8_t> buf((len+1) * sizeof(PA_Unichar));
             CFStringGetCharacters(str, CFRangeMake(0, len), (UniChar *)&buf[0]);
-            u16k = CUTF16String((const PA_Unichar *)&buf[0]);
+            u16k = CUTF16String((const PA_Unichar *)&buf[0], (size_t)len);
             CFRelease(str);
         }
         str = CFStringCreateWithBytes(kCFAllocatorDefault, u8v.c_str(), u8v.length(), kCFStringEncodingUTF8, true);
@@ -78,7 +78,7 @@ void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
             CFIndex len = CFStringGetLength(str);
             std::vector<uint8_t> buf((len+1) * sizeof(PA_Unichar));
             CFStringGetCharacters(str, CFRangeMake(0, len), (UniChar *)&buf[0]);
-            u16v = CUTF16String((const PA_Unichar *)&buf[0]);
+            u16v = CUTF16String((const PA_Unichar *)&buf[0], (size_t)len);
             CFRelease(str);
         }
 #endif
@@ -117,7 +117,7 @@ void ob_set_s(PA_ObjectRef obj, const wchar_t *_key, const char *_value) {
             if(len){
                 std::vector<uint8_t> buf((len + 1) * sizeof(PA_Unichar));
                 if(MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)u8.c_str(), u8.length(), (LPWSTR)&buf[0], len)){
-                    u16 = CUTF16String((const PA_Unichar *)&buf[0]);
+                    u16 = CUTF16String((const PA_Unichar *)&buf[0], (size_t)len);
                 }
             }else{
                 u16 = CUTF16String((const PA_Unichar *)L"");
@@ -302,7 +302,7 @@ bool ob_get_a(PA_ObjectRef obj, const wchar_t *_key, CUTF8String *value) {
                 if(len){
                     std::vector<uint8_t> buf(len + 1);
                     if(WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)u.c_str(), u.length(), (LPSTR)&buf[0], len, NULL, NULL)){
-                        *value = CUTF8String((const uint8_t *)&buf[0]);
+                        *value = CUTF8String((const uint8_t *)&buf[0], (size_t)len);
                     }
                 }else{
                     *value = CUTF8String((const uint8_t *)"");
@@ -413,11 +413,22 @@ PA_CollectionRef ob_get_c(PA_ObjectRef obj, const wchar_t *_key) {
 
 void ob_stringify(PA_ObjectRef obj, CUTF8String *value) {
     
+    if(!obj || !value) return;
+    
     PA_Variable    _params[1];
     _params[0] = PA_CreateVariable(eVK_Object);
     PA_SetObjectVariable(&_params[0], PA_DuplicateObject(obj));
     PA_Variable vjson = PA_ExecuteCommandByID( /*JSON Stringify */1217, _params, 1);
     PA_ClearVariable(&_params[0]);
+    
+    if(PA_GetVariableKind(vjson) != eVK_Unistring)
+    {
+        // "JSON Stringify" didn't return a string (unexpected failure) --
+        // bail out instead of reading a Unistring out of a variable that
+        // may not hold one.
+        PA_ClearVariable(&vjson);
+        return;
+    }
     
     PA_Unistring ujson = PA_GetStringVariable(vjson);
     
@@ -427,7 +438,7 @@ void ob_stringify(PA_ObjectRef obj, CUTF8String *value) {
     if(len){
         std::vector<uint8_t> buf(len + 1);
         if(WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)ujson.fString, ujson.fLength, (LPSTR)&buf[0], len, NULL, NULL)){
-            *value = CUTF8String((const uint8_t *)&buf[0]);
+            *value = CUTF8String((const uint8_t *)&buf[0], (size_t)len);
         }
     }else{
         *value = CUTF8String((const uint8_t *)"");
