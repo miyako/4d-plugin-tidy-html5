@@ -9,8 +9,48 @@
  # --------------------------------------------------------------------------------*/
 
 #include "4DPlugin-tidy-html5.h"
+#include <mutex>
 
 #pragma mark -
+
+// tidySetLanguage() sets PROCESS-WIDE state inside libtidy (it is not
+// per-TidyDoc). 4D can invoke this plugin concurrently from multiple
+// threads/processes, so without serialization two overlapping calls with
+// different "language" options can race on libtidy's shared internal
+// string/locale tables. We serialize the whole Tidy() call with a static
+// mutex to make that safe. Tidy documents are small enough that this does
+// not create a meaningful bottleneck.
+static std::mutex g_tidyMutex;
+
+// RAII guard: guarantees tidyRelease()/tidyBufFree()/PA_UnlockHandle() run
+// on every exit path -- including if an exception is thrown partway through
+// Tidy() (e.g. from std::string allocation or a JSON helper) -- so the
+// caller's handle never stays locked and libtidy resources never leak.
+struct TidyRunGuard
+{
+    TidyDoc doc = nullptr;
+    TidyBuffer *inputBuf = nullptr;
+    TidyBuffer *outputBuf = nullptr;
+    TidyBuffer *errorBuf = nullptr;
+    PA_Handle handle = nullptr;
+    bool handleLocked = false;
+
+    ~TidyRunGuard()
+    {
+        if (inputBuf)
+        {
+            // detach before freeing: this buffer wraps memory owned by the
+            // 4D handle, not memory libtidy allocated, so it must never be
+            // freed by tidyBufFree().
+            tidyBufDetach(inputBuf);
+            tidyBufFree(inputBuf);
+        }
+        if (outputBuf) tidyBufFree(outputBuf);
+        if (errorBuf)  tidyBufFree(errorBuf);
+        if (doc)       tidyRelease(doc);
+        if (handleLocked && handle) PA_UnlockHandle(handle);
+    }
+};
 
 void PluginMain(PA_long32 selector, PA_PluginParameters params) {
     
@@ -37,20 +77,40 @@ void PluginMain(PA_long32 selector, PA_PluginParameters params) {
 
 void Tidy(PA_PluginParameters params) {
 
+    // Serializes the whole call because tidySetLanguage() below touches
+    // libtidy's process-global state -- see comment on g_tidyMutex.
+    std::lock_guard<std::mutex> lock(g_tidyMutex);
+
     PA_ObjectRef returnValue = PA_CreateObject();
-    
+
     PA_Handle h = PA_GetBlobHandleParameter( params, 1 );
     PA_ObjectRef options = PA_GetObjectParameter( params, 2 );
-    
+
     if(h)
     {
         TidyDoc tdoc = tidyCreate();
-        
-        if(ob_is_defined(options, L"accessibilityCheckLevel"))
+
+        if(!tdoc)
+        {
+            // Allocation failed inside libtidy -- bail out cleanly instead
+            // of dereferencing a null TidyDoc on every following call.
+            ob_set_n(returnValue, L"status", (PA_long32)-1);
+            ob_set_s(returnValue, L"info", "tidyCreate() failed");
+            PA_ReturnObject(params, returnValue);
+            return;
+        }
+
+        TidyRunGuard guard;
+        guard.doc = tdoc;
+        guard.handle = h;
+
+        // `options` (parameter 2) is optional/caller-supplied; guard every
+        // lookup against it being null instead of assuming it's present.
+        if(options && ob_is_defined(options, L"accessibilityCheckLevel"))
         {
             tidyOptSetInt(tdoc, TidyAccessibilityCheckLevel, (ulong)ob_get_n(options, L"accessibilityCheckLevel"));
         }
-        if(ob_is_defined(options, L"altText"))
+        if(options && ob_is_defined(options, L"altText"))
         {
             CUTF8String altText;
             if(ob_get_a(options, L"altText", &altText))
@@ -58,15 +118,15 @@ void Tidy(PA_PluginParameters params) {
                 tidyOptSetValue(tdoc, TidyAltText, (ctmbstr)altText.c_str());
             }
         }
-        if(ob_is_defined(options, L"anchorAsName"))
+        if(options && ob_is_defined(options, L"anchorAsName"))
         {
             tidyOptSetBool(tdoc, TidyAnchorAsName, (Bool)ob_get_b(options, L"anchorAsName"));
         }
-        if(ob_is_defined(options, L"asciiChars"))
+        if(options && ob_is_defined(options, L"asciiChars"))
         {
             tidyOptSetBool(tdoc, TidyAsciiChars, (Bool)ob_get_b(options, L"asciiChars"));
         }
-        if(ob_is_defined(options, L"blockTags"))
+        if(options && ob_is_defined(options, L"blockTags"))
         {
             PA_CollectionRef tags = ob_get_c(options, L"blockTags");
             if(tags) {
@@ -83,7 +143,7 @@ void Tidy(PA_PluginParameters params) {
                 }
             }
         }
-        if(ob_is_defined(options, L"emptyTags"))
+        if(options && ob_is_defined(options, L"emptyTags"))
         {
             PA_CollectionRef tags = ob_get_c(options, L"emptyTags");
             if(tags) {
@@ -100,7 +160,7 @@ void Tidy(PA_PluginParameters params) {
                 }
             }
         }
-        if(ob_is_defined(options, L"inlineTags"))
+        if(options && ob_is_defined(options, L"inlineTags"))
         {
             PA_CollectionRef tags = ob_get_c(options, L"inlineTags");
             if(tags) {
@@ -117,7 +177,7 @@ void Tidy(PA_PluginParameters params) {
                 }
             }
         }
-        if(ob_is_defined(options, L"preTags"))
+        if(options && ob_is_defined(options, L"preTags"))
         {
             PA_CollectionRef tags = ob_get_c(options, L"preTags");
             if(tags) {
@@ -134,19 +194,19 @@ void Tidy(PA_PluginParameters params) {
                 }
             }
         }
-        if(ob_is_defined(options, L"bodyOnly"))
+        if(options && ob_is_defined(options, L"bodyOnly"))
         {
             tidyOptSetBool(tdoc, TidyBodyOnly, (Bool)ob_get_b(options, L"bodyOnly"));
         }
-        if(ob_is_defined(options, L"breakBeforeBR"))
+        if(options && ob_is_defined(options, L"breakBeforeBR"))
         {
             tidyOptSetBool(tdoc, TidyBreakBeforeBR, (Bool)ob_get_b(options, L"breakBeforeBR"));
         }
-        if(ob_is_defined(options, L"coerceEndTags"))
+        if(options && ob_is_defined(options, L"coerceEndTags"))
         {
             tidyOptSetBool(tdoc, TidyCoerceEndTags, (Bool)ob_get_b(options, L"coerceEndTags"));
         }
-        if(ob_is_defined(options, L"CSSPrefix"))
+        if(options && ob_is_defined(options, L"CSSPrefix"))
         {
             CUTF8String prefix;
             if(ob_get_a(options, L"CSSPrefix", &prefix))
@@ -154,11 +214,11 @@ void Tidy(PA_PluginParameters params) {
                 tidyOptSetValue(tdoc, TidyCSSPrefix, (ctmbstr)prefix.c_str());
             }
         }
-        if(ob_is_defined(options, L"decorateInferredUL"))
+        if(options && ob_is_defined(options, L"decorateInferredUL"))
         {
             tidyOptSetBool(tdoc, TidyDecorateInferredUL, (Bool)ob_get_b(options, L"decorateInferredUL"));
         }
-        if(ob_is_defined(options, L"doctype"))
+        if(options && ob_is_defined(options, L"doctype"))
         {
             CUTF8String doctype;
             if(ob_get_a(options, L"doctype", &doctype))
@@ -166,327 +226,333 @@ void Tidy(PA_PluginParameters params) {
                 tidyOptSetValue(tdoc, TidyDoctype, (ctmbstr)doctype.c_str());
             }
         }
-        if(ob_is_defined(options, L"dropEmptyElems"))
+        if(options && ob_is_defined(options, L"dropEmptyElems"))
         {
             tidyOptSetBool(tdoc, TidyDropEmptyElems, (Bool)ob_get_b(options, L"dropEmptyElems"));
         }
-        if(ob_is_defined(options, L"dropEmptyParas"))
+        if(options && ob_is_defined(options, L"dropEmptyParas"))
         {
             tidyOptSetBool(tdoc, TidyDropEmptyParas, (Bool)ob_get_b(options, L"dropEmptyParas"));
         }
-        if(ob_is_defined(options, L"dropPropAttrs"))
+        if(options && ob_is_defined(options, L"dropPropAttrs"))
         {
             tidyOptSetBool(tdoc, TidyDropPropAttrs, (Bool)ob_get_b(options, L"dropPropAttrs"));
         }
-        if(ob_is_defined(options, L"duplicateAttrs"))
+        if(options && ob_is_defined(options, L"duplicateAttrs"))
         {
             tidyOptSetBool(tdoc, TidyDuplicateAttrs, (Bool)ob_get_b(options, L"duplicateAttrs"));
         }
-        if(ob_is_defined(options, L"emacs"))
+        if(options && ob_is_defined(options, L"emacs"))
         {
             tidyOptSetBool(tdoc, TidyEmacs, (Bool)ob_get_b(options, L"emacs"));
         }
-        if(ob_is_defined(options, L"encloseBlockText"))
+        if(options && ob_is_defined(options, L"encloseBlockText"))
         {
             tidyOptSetBool(tdoc, TidyEncloseBlockText, (Bool)ob_get_b(options, L"encloseBlockText"));
         }
-        if(ob_is_defined(options, L"encloseBodyText"))
+        if(options && ob_is_defined(options, L"encloseBodyText"))
         {
             tidyOptSetBool(tdoc, TidyEncloseBodyText, (Bool)ob_get_b(options, L"encloseBodyText"));
         }
-        if(ob_is_defined(options, L"escapeCdata"))
+        if(options && ob_is_defined(options, L"escapeCdata"))
         {
             tidyOptSetBool(tdoc, TidyEscapeCdata, (Bool)ob_get_b(options, L"escapeCdata"));
         }
-        if(ob_is_defined(options, L"escapeScripts"))
+        if(options && ob_is_defined(options, L"escapeScripts"))
         {
             tidyOptSetBool(tdoc, TidyEscapeScripts, (Bool)ob_get_b(options, L"escapeScripts"));
         }
-        if(ob_is_defined(options, L"fixBackslash"))
+        if(options && ob_is_defined(options, L"fixBackslash"))
         {
             tidyOptSetBool(tdoc, TidyFixBackslash, (Bool)ob_get_b(options, L"fixBackslash"));
         }
-        if(ob_is_defined(options, L"fixComments"))
+        if(options && ob_is_defined(options, L"fixComments"))
         {
             tidyOptSetBool(tdoc, TidyFixComments, (Bool)ob_get_b(options, L"fixComments"));
         }
-        if(ob_is_defined(options, L"fixUri"))
+        if(options && ob_is_defined(options, L"fixUri"))
         {
             tidyOptSetBool(tdoc, TidyFixUri, (Bool)ob_get_b(options, L"fixUri"));
         }
-        if(ob_is_defined(options, L"fixUri"))
+        if(options && ob_is_defined(options, L"fixUri"))
         {
             tidyOptSetBool(tdoc, TidyFixUri, (Bool)ob_get_b(options, L"fixUri"));
         }
-        if(ob_is_defined(options, L"gDocClean"))
+        if(options && ob_is_defined(options, L"gDocClean"))
         {
             tidyOptSetBool(tdoc, TidyGDocClean, (Bool)ob_get_b(options, L"gDocClean"));
         }
-        if(ob_is_defined(options, L"hideComments"))
+        if(options && ob_is_defined(options, L"hideComments"))
         {
             tidyOptSetBool(tdoc, TidyHideComments, (Bool)ob_get_b(options, L"hideComments"));
         }
-        if(ob_is_defined(options, L"htmlOut"))
+        if(options && ob_is_defined(options, L"htmlOut"))
         {
             tidyOptSetBool(tdoc, TidyHtmlOut, (Bool)ob_get_b(options, L"htmlOut"));
         }
-        if(ob_is_defined(options, L"indentSpaces"))
+        if(options && ob_is_defined(options, L"indentSpaces"))
         {
-            tidyOptSetBool(tdoc, TidyIndentSpaces, (Bool)ob_get_b(options, L"indentSpaces"));
+            // TidyIndentSpaces is an integer option (number of spaces),
+            // not a boolean -- tidyOptSetBool() would silently reject it.
+            tidyOptSetInt(tdoc, TidyIndentSpaces, (ulong)ob_get_n(options, L"indentSpaces"));
         }
-        if(ob_is_defined(options, L"indentAttributes"))
+        if(options && ob_is_defined(options, L"indentAttributes"))
         {
             tidyOptSetInt(tdoc, TidyIndentAttributes, (ulong)ob_get_n(options, L"indentAttributes"));
             if (tidyOptGetInt(tdoc, TidyIndentSpaces) == 0)
                 tidyOptResetToDefault(tdoc, TidyIndentSpaces);
         }
-        if(ob_is_defined(options, L"indentCdata"))
+        if(options && ob_is_defined(options, L"indentCdata"))
         {
             tidyOptSetInt(tdoc, TidyIndentCdata, (ulong)ob_get_n(options, L"indentCdata"));
             if (tidyOptGetInt(tdoc, TidyIndentSpaces) == 0)
                 tidyOptResetToDefault(tdoc, TidyIndentSpaces);
         }
-        if(ob_is_defined(options, L"indentContent"))
+        if(options && ob_is_defined(options, L"indentContent"))
         {
             tidyOptSetInt(tdoc, TidyIndentContent, (ulong)ob_get_n(options, L"indentContent"));
             if (tidyOptGetInt(tdoc, TidyIndentSpaces) == 0)
                 tidyOptResetToDefault(tdoc, TidyIndentSpaces);
         }
-        if(ob_is_defined(options, L"joinClasses"))
+        if(options && ob_is_defined(options, L"joinClasses"))
         {
             tidyOptSetBool(tdoc, TidyJoinClasses, (Bool)ob_get_b(options, L"joinClasses"));
         }
-        if(ob_is_defined(options, L"joinStyles"))
+        if(options && ob_is_defined(options, L"joinStyles"))
         {
             tidyOptSetBool(tdoc, TidyJoinStyles, (Bool)ob_get_b(options, L"joinStyles"));
         }
-        if(ob_is_defined(options, L"keepFileTimes"))
+        if(options && ob_is_defined(options, L"keepFileTimes"))
         {
             tidyOptSetBool(tdoc, TidyKeepFileTimes, (Bool)ob_get_b(options, L"keepFileTimes"));
         }
-        if(ob_is_defined(options, L"keepTabs"))
+        if(options && ob_is_defined(options, L"keepTabs"))
         {
             tidyOptSetBool(tdoc, TidyKeepTabs, (Bool)ob_get_b(options, L"keepTabs"));
         }
-        if(ob_is_defined(options, L"literalAttribs"))
+        if(options && ob_is_defined(options, L"literalAttribs"))
         {
             tidyOptSetBool(tdoc, TidyLiteralAttribs, (Bool)ob_get_b(options, L"literalAttribs"));
         }
-        if(ob_is_defined(options, L"logicalEmphasis"))
+        if(options && ob_is_defined(options, L"logicalEmphasis"))
         {
             tidyOptSetBool(tdoc, TidyLogicalEmphasis, (Bool)ob_get_b(options, L"logicalEmphasis"));
         }
-        if(ob_is_defined(options, L"lowerLiterals"))
+        if(options && ob_is_defined(options, L"lowerLiterals"))
         {
             tidyOptSetBool(tdoc, TidyLowerLiterals, (Bool)ob_get_b(options, L"lowerLiterals"));
         }
-        if(ob_is_defined(options, L"makeBare"))
+        if(options && ob_is_defined(options, L"makeBare"))
         {
             tidyOptSetBool(tdoc, TidyMakeBare, (Bool)ob_get_b(options, L"makeBare"));
         }
-        if(ob_is_defined(options, L"makeClean"))
+        if(options && ob_is_defined(options, L"makeClean"))
         {
             tidyOptSetBool(tdoc, TidyMakeClean, (Bool)ob_get_b(options, L"makeClean"));
         }
-        if(ob_is_defined(options, L"mark"))
+        if(options && ob_is_defined(options, L"mark"))
         {
             tidyOptSetBool(tdoc, TidyMark, (Bool)ob_get_b(options, L"mark"));
         }
-        if(ob_is_defined(options, L"mergeDivs"))
+        if(options && ob_is_defined(options, L"mergeDivs"))
         {
             tidyOptSetBool(tdoc, TidyMergeDivs, (Bool)ob_get_b(options, L"mergeDivs"));
         }
-        if(ob_is_defined(options, L"mergeEmphasis"))
+        if(options && ob_is_defined(options, L"mergeEmphasis"))
         {
             tidyOptSetBool(tdoc, TidyMergeEmphasis, (Bool)ob_get_b(options, L"mergeEmphasis"));
         }
-        if(ob_is_defined(options, L"mergeSpans"))
+        if(options && ob_is_defined(options, L"mergeSpans"))
         {
             tidyOptSetBool(tdoc, TidyMergeSpans, (Bool)ob_get_b(options, L"mergeSpans"));
         }
-        if(ob_is_defined(options, L"metaCharset"))
+        if(options && ob_is_defined(options, L"metaCharset"))
         {
             tidyOptSetBool(tdoc, TidyMetaCharset, (Bool)ob_get_b(options, L"metaCharset"));
         }
-        if(ob_is_defined(options, L"NCR"))
+        if(options && ob_is_defined(options, L"NCR"))
         {
             tidyOptSetBool(tdoc, TidyNCR, (Bool)ob_get_b(options, L"NCR"));
         }
-        if(ob_is_defined(options, L"newline"))
+        if(options && ob_is_defined(options, L"newline"))
         {
             tidyOptSetBool(tdoc, TidyNewline, (Bool)ob_get_b(options, L"newline"));
         }
-        if(ob_is_defined(options, L"numEntities"))
+        if(options && ob_is_defined(options, L"numEntities"))
         {
             tidyOptSetBool(tdoc, TidyNumEntities, (Bool)ob_get_b(options, L"numEntities"));
         }
-        if(ob_is_defined(options, L"omitOptionalTags"))
+        if(options && ob_is_defined(options, L"omitOptionalTags"))
         {
             tidyOptSetBool(tdoc, TidyOmitOptionalTags, (Bool)ob_get_b(options, L"omitOptionalTags"));
         }
-        if(ob_is_defined(options, L"outputBOM"))
+        if(options && ob_is_defined(options, L"outputBOM"))
         {
             tidyOptSetBool(tdoc, TidyOutputBOM, (Bool)ob_get_b(options, L"outputBOM"));
         }
-        if(ob_is_defined(options, L"pPrintTabs"))
+        if(options && ob_is_defined(options, L"pPrintTabs"))
         {
             tidyOptSetBool(tdoc, TidyPPrintTabs, (Bool)ob_get_b(options, L"pPrintTabs"));
         }
-        if(ob_is_defined(options, L"preserveEntities"))
+        if(options && ob_is_defined(options, L"preserveEntities"))
         {
             tidyOptSetBool(tdoc, TidyPreserveEntities, (Bool)ob_get_b(options, L"preserveEntities"));
         }
-        if(ob_is_defined(options, L"priorityAttributes"))
+        if(options && ob_is_defined(options, L"priorityAttributes"))
         {
             tidyOptSetBool(tdoc, TidyPriorityAttributes, (Bool)ob_get_b(options, L"priorityAttributes"));
         }
-        if(ob_is_defined(options, L"punctWrap"))
+        if(options && ob_is_defined(options, L"punctWrap"))
         {
             tidyOptSetBool(tdoc, TidyPunctWrap, (Bool)ob_get_b(options, L"punctWrap"));
         }
-        if(ob_is_defined(options, L"quiet"))
+        if(options && ob_is_defined(options, L"quiet"))
         {
             tidyOptSetBool(tdoc, TidyQuiet, (Bool)ob_get_b(options, L"quiet"));
         }
-        if(ob_is_defined(options, L"quoteAmpersand"))
+        if(options && ob_is_defined(options, L"quoteAmpersand"))
         {
             tidyOptSetBool(tdoc, TidyQuoteAmpersand, (Bool)ob_get_b(options, L"quoteAmpersand"));
         }
-        if(ob_is_defined(options, L"quoteMarks"))
+        if(options && ob_is_defined(options, L"quoteMarks"))
         {
             tidyOptSetBool(tdoc, TidyQuoteMarks, (Bool)ob_get_b(options, L"quoteMarks"));
         }
-        if(ob_is_defined(options, L"quoteNbsp"))
+        if(options && ob_is_defined(options, L"quoteNbsp"))
         {
             tidyOptSetBool(tdoc, TidyQuoteNbsp, (Bool)ob_get_b(options, L"quoteNbsp"));
         }
-        if(ob_is_defined(options, L"replaceColor"))
+        if(options && ob_is_defined(options, L"replaceColor"))
         {
             tidyOptSetBool(tdoc, TidyReplaceColor, (Bool)ob_get_b(options, L"replaceColor"));
         }
-        if(ob_is_defined(options, L"showErrors"))
+        if(options && ob_is_defined(options, L"showErrors"))
         {
             tidyOptSetBool(tdoc, TidyShowErrors, (Bool)ob_get_b(options, L"showErrors"));
         }
-        if(ob_is_defined(options, L"showInfo"))
+        if(options && ob_is_defined(options, L"showInfo"))
         {
             tidyOptSetBool(tdoc, TidyShowInfo, (Bool)ob_get_b(options, L"showInfo"));
         }
-        if(ob_is_defined(options, L"showMarkup"))
+        if(options && ob_is_defined(options, L"showMarkup"))
         {
             tidyOptSetBool(tdoc, TidyShowMarkup, (Bool)ob_get_b(options, L"showMarkup"));
         }
-        if(ob_is_defined(options, L"showMetaChange"))
+        if(options && ob_is_defined(options, L"showMetaChange"))
         {
             tidyOptSetBool(tdoc, TidyShowMetaChange, (Bool)ob_get_b(options, L"showMetaChange"));
         }
-        if(ob_is_defined(options, L"showWarnings"))
+        if(options && ob_is_defined(options, L"showWarnings"))
         {
             tidyOptSetBool(tdoc, TidyShowWarnings, (Bool)ob_get_b(options, L"showWarnings"));
         }
-        if(ob_is_defined(options, L"skipNested"))
+        if(options && ob_is_defined(options, L"skipNested"))
         {
             tidyOptSetBool(tdoc, TidySkipNested, (Bool)ob_get_b(options, L"skipNested"));
         }
-        if(ob_is_defined(options, L"sortAttributes"))
+        if(options && ob_is_defined(options, L"sortAttributes"))
         {
             tidyOptSetBool(tdoc, TidySortAttributes, (Bool)ob_get_b(options, L"sortAttributes"));
         }
-        if(ob_is_defined(options, L"strictTagsAttr"))
+        if(options && ob_is_defined(options, L"strictTagsAttr"))
         {
             tidyOptSetBool(tdoc, TidyStrictTagsAttr, (Bool)ob_get_b(options, L"strictTagsAttr"));
         }
-        if(ob_is_defined(options, L"styleTags"))
+        if(options && ob_is_defined(options, L"styleTags"))
         {
             tidyOptSetBool(tdoc, TidyStyleTags, (Bool)ob_get_b(options, L"styleTags"));
         }
-        if(ob_is_defined(options, L"tabSize"))
+        if(options && ob_is_defined(options, L"tabSize"))
         {
-            tidyOptSetBool(tdoc, TidyTabSize, (Bool)ob_get_b(options, L"tabSize"));
+            // TidyTabSize is an integer option, not a boolean.
+            tidyOptSetInt(tdoc, TidyTabSize, (ulong)ob_get_n(options, L"tabSize"));
         }
-        if(ob_is_defined(options, L"upperCaseAttrs"))
+        if(options && ob_is_defined(options, L"upperCaseAttrs"))
         {
             tidyOptSetBool(tdoc, TidyUpperCaseAttrs, (Bool)ob_get_b(options, L"upperCaseAttrs"));
         }
-        if(ob_is_defined(options, L"upperCaseTags"))
+        if(options && ob_is_defined(options, L"upperCaseTags"))
         {
             tidyOptSetBool(tdoc, TidyUpperCaseTags, (Bool)ob_get_b(options, L"upperCaseTags"));
         }
-        if(ob_is_defined(options, L"useCustomTags"))
+        if(options && ob_is_defined(options, L"useCustomTags"))
         {
             tidyOptSetBool(tdoc, TidyUseCustomTags, (Bool)ob_get_b(options, L"useCustomTags"));
         }
-        if(ob_is_defined(options, L"vertSpace"))
+        if(options && ob_is_defined(options, L"vertSpace"))
         {
             tidyOptSetBool(tdoc, TidyVertSpace, (Bool)ob_get_b(options, L"vertSpace"));
         }
-        if(ob_is_defined(options, L"warnPropAttrs"))
+        if(options && ob_is_defined(options, L"warnPropAttrs"))
         {
             tidyOptSetBool(tdoc, TidyWarnPropAttrs, (Bool)ob_get_b(options, L"warnPropAttrs"));
         }
-        if(ob_is_defined(options, L"word2000"))
+        if(options && ob_is_defined(options, L"word2000"))
         {
             tidyOptSetBool(tdoc, TidyWord2000, (Bool)ob_get_b(options, L"word2000"));
         }
-        if(ob_is_defined(options, L"wrapAsp"))
+        if(options && ob_is_defined(options, L"wrapAsp"))
         {
             tidyOptSetBool(tdoc, TidyWrapAsp, (Bool)ob_get_b(options, L"wrapAsp"));
         }
-        if(ob_is_defined(options, L"wrapAttVals"))
+        if(options && ob_is_defined(options, L"wrapAttVals"))
         {
             tidyOptSetBool(tdoc, TidyWrapAttVals, (Bool)ob_get_b(options, L"wrapAttVals"));
         }
-        if(ob_is_defined(options, L"wrapJste"))
+        if(options && ob_is_defined(options, L"wrapJste"))
         {
             tidyOptSetBool(tdoc, TidyWrapJste, (Bool)ob_get_b(options, L"wrapJste"));
         }
-        if(ob_is_defined(options, L"wrapLen"))
+        if(options && ob_is_defined(options, L"wrapLen"))
         {
             tidyOptSetInt(tdoc, TidyWrapLen, (ulong)ob_get_n(options, L"wrapLen"));
         }
-        if(ob_is_defined(options, L"wrapPhp"))
+        if(options && ob_is_defined(options, L"wrapPhp"))
         {
-            tidyOptSetInt(tdoc, TidyWrapPhp, (ulong)ob_get_n(options, L"wrapPhp"));
+            // TidyWrapPhp is a (deprecated) boolean option, not an integer.
+            tidyOptSetBool(tdoc, TidyWrapPhp, (Bool)ob_get_b(options, L"wrapPhp"));
         }
-        if(ob_is_defined(options, L"wrapScriptlets"))
+        if(options && ob_is_defined(options, L"wrapScriptlets"))
         {
-            tidyOptSetInt(tdoc, TidyWrapScriptlets, (ulong)ob_get_n(options, L"wrapScriptlets"));
+            // TidyWrapScriptlets is a (deprecated) boolean option, not an integer.
+            tidyOptSetBool(tdoc, TidyWrapScriptlets, (Bool)ob_get_b(options, L"wrapScriptlets"));
         }
-        if(ob_is_defined(options, L"wrapSection"))
+        if(options && ob_is_defined(options, L"wrapSection"))
         {
-            tidyOptSetInt(tdoc, TidyWrapSection, (ulong)ob_get_n(options, L"wrapSection"));
+            // TidyWrapSection is a (deprecated) boolean option, not an integer.
+            tidyOptSetBool(tdoc, TidyWrapSection, (Bool)ob_get_b(options, L"wrapSection"));
         }
-        if(ob_is_defined(options, L"writeBack"))
+        if(options && ob_is_defined(options, L"writeBack"))
         {
             tidyOptSetBool(tdoc, TidyWriteBack, (Bool)ob_get_b(options, L"writeBack"));
         }
-        if(ob_is_defined(options, L"xhtmlOut"))
+        if(options && ob_is_defined(options, L"xhtmlOut"))
         {
             tidyOptSetBool(tdoc, TidyXhtmlOut, (Bool)ob_get_b(options, L"xhtmlOut"));
         }
-        if(ob_is_defined(options, L"xmlDecl"))
+        if(options && ob_is_defined(options, L"xmlDecl"))
         {
             tidyOptSetBool(tdoc, TidyXmlDecl, (Bool)ob_get_b(options, L"xmlDecl"));
         }
-        if(ob_is_defined(options, L"xmlOut"))
+        if(options && ob_is_defined(options, L"xmlOut"))
         {
             tidyOptSetBool(tdoc, TidyXmlOut, (Bool)ob_get_b(options, L"xmlOut"));
         }
-        if(ob_is_defined(options, L"xmlPIs"))
+        if(options && ob_is_defined(options, L"xmlPIs"))
         {
             tidyOptSetBool(tdoc, TidyXmlPIs, (Bool)ob_get_b(options, L"xmlPIs"));
         }
-        if(ob_is_defined(options, L"xmlSpace"))
+        if(options && ob_is_defined(options, L"xmlSpace"))
         {
             tidyOptSetBool(tdoc, TidyXmlSpace, (Bool)ob_get_b(options, L"xmlSpace"));
         }
         
-        if(ob_is_defined(options, L"xmlTags"))
+        if(options && ob_is_defined(options, L"xmlTags"))
         {
             tidyOptSetBool(tdoc, TidyXmlTags, (Bool)ob_get_b(options, L"xmlTags"));
         }
 
-        if(ob_is_defined(options, L"encoding"))
+        if(options && ob_is_defined(options, L"encoding"))
         {
             CUTF8String encoding;
             if(ob_get_a(options, L"encoding", &encoding))
@@ -495,7 +561,7 @@ void Tidy(PA_PluginParameters params) {
             }
         }
         
-        if(ob_is_defined(options, L"language"))
+        if(options && ob_is_defined(options, L"language"))
         {
             CUTF8String language;
             if(ob_get_a(options, L"language", &language))
@@ -505,32 +571,49 @@ void Tidy(PA_PluginParameters params) {
         }
         
         tidySetOutCharEncoding(tdoc, "utf8");
-        
+
         TidyBuffer inputBuf, outputBuf, errorBuf;
 
         tidyBufInit(&inputBuf);
         tidyBufInit(&outputBuf);
         tidyBufInit(&errorBuf);
-        
-        tidyBufAttach(&inputBuf, (byte *)PA_LockHandle(h), PA_GetHandleSize(h));
-        
+
+        // Register with the guard immediately -- from this point on, any
+        // exception thrown below (e.g. std::string allocation) still
+        // results in these buffers being detached/freed and the handle
+        // being unlocked when `guard` goes out of scope.
+        guard.inputBuf = &inputBuf;
+        guard.outputBuf = &outputBuf;
+        guard.errorBuf = &errorBuf;
+
+        void *lockedPtr = PA_LockHandle(h);
+        guard.handleLocked = true;
+
+        if(lockedPtr)
+        {
+            tidyBufAttach(&inputBuf, (byte *)lockedPtr, PA_GetHandleSize(h));
+        }
+
         int isErrorBufferSet = !tidySetErrorBuffer(tdoc, &errorBuf);
-        
+
         ob_set_n(returnValue, L"status", tidyParseBuffer(tdoc, &inputBuf));
         ob_set_b(returnValue, L"detectedGenericXml", tidyDetectedGenericXml(tdoc));
-        ob_set_b(returnValue, L"detectedHtmlVersion", tidyDetectedHtmlVersion(tdoc));
+        // tidyDetectedHtmlVersion() returns a version number (e.g. 0/2/3/4/5),
+        // not a yes/no flag -- ob_set_b() would collapse it to a boolean and
+        // discard the actual version.
+        ob_set_n(returnValue, L"detectedHtmlVersion", tidyDetectedHtmlVersion(tdoc));
         ob_set_b(returnValue, L"detectedXhtml", tidyDetectedXhtml(tdoc));
 
         int errorCount = tidyErrorCount(tdoc);
         ob_set_n(returnValue, L"errorCount", errorCount);
-        
+
         if(!errorCount)
         {
             tidySaveBuffer(tdoc, &outputBuf);
             std::string html = std::string((const char *)outputBuf.bp, outputBuf.size);
             ob_set_s(returnValue, L"html", (const char *)html.c_str());
         }
-        
+
         if(isErrorBufferSet)
         {
             tidyGeneralInfo(tdoc);
@@ -539,17 +622,11 @@ void Tidy(PA_PluginParameters params) {
             ob_set_s(returnValue, L"info", (const char *)err.c_str());
         }
 
-        tidyBufDetach(&inputBuf);
-
-        tidyBufFree(&inputBuf);
-        tidyBufFree(&outputBuf);
-        tidyBufFree(&errorBuf);
-        
-        tidyRelease(tdoc);
-        
-        PA_UnlockHandle(h);
+        // No manual cleanup here: `guard`'s destructor detaches/frees the
+        // buffers, releases tdoc, and unlocks the handle -- on this path
+        // and on any exception path alike.
     }
-    
+
     PA_ReturnObject(params, returnValue);
 }
 
