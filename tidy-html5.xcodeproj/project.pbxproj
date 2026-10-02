@@ -24,6 +24,7 @@
 		D16045F922E7009800EC7FF0 /* 4DPlugin-JSON.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D16045F722E7009800EC7FF0 /* 4DPlugin-JSON.cpp */; };
 		D16045FA22E7009800EC7FF0 /* 4DPlugin-JSON.h in Headers */ = {isa = PBXBuildFile; fileRef = D16045F822E7009800EC7FF0 /* 4DPlugin-JSON.h */; };
 		D16F9E1E27527BA600D21E58 /* libtidy.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D16F9E1D27527BA600D21E58 /* libtidy.a */; };
+		1F6F77BAAE35DDE040218D22 /* constants.xlf in CopyFiles */ = {isa = PBXBuildFile; fileRef = D14D10DD1A03A8A5008B3411 /* constants.xlf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -34,6 +35,7 @@
 			dstSubfolderSpec = 7;
 			files = (
 				D134D4AC1A030BA0008D14EF /* manifest.json in CopyFiles */,
+				1F6F77BAAE35DDE040218D22 /* constants.xlf in CopyFiles */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
