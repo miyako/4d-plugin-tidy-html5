@@ -25,7 +25,7 @@ void ob_set_p(PA_ObjectRef obj, const wchar_t *_key, PA_Picture value) {
     {
         if(value)
         {
-            PA_Variable v = PA_CreateVariable(eVK_Picture);
+            PA_Variable v = PA_CreateVariable(eVK_Undefined);
             CUTF16String ukey;
             json_wconv(_key, &ukey);
             PA_Unistring key = PA_CreateUnistring((PA_Unichar *)ukey.c_str());
@@ -86,7 +86,7 @@ void ob_set_s(PA_ObjectRef obj, const char *_key, const char *_value) {
         PA_Unistring key = PA_CreateUnistring((PA_Unichar *)u16k.c_str());
         PA_Unistring value = PA_CreateUnistring((PA_Unichar *)u16v.c_str());
         
-        PA_Variable v = PA_CreateVariable(eVK_Unistring);
+        PA_Variable v = PA_CreateVariable(eVK_Undefined);
         PA_SetStringVariable(&v, &value);
         PA_SetObjectProperty(obj, &key, v);
         
@@ -103,7 +103,7 @@ void ob_set_s(PA_ObjectRef obj, const wchar_t *_key, const char *_value) {
     {
         if(_value)
         {
-            PA_Variable v = PA_CreateVariable(eVK_Unistring);
+            PA_Variable v = PA_CreateVariable(eVK_Undefined);
             CUTF16String ukey;
             
             json_wconv(_key, &ukey);
@@ -151,7 +151,7 @@ void ob_set_a(PA_ObjectRef obj, const wchar_t *_key, const wchar_t *_value) {
     {
         if(_value)
         {
-            PA_Variable v = PA_CreateVariable(eVK_Unistring);
+            PA_Variable v = PA_CreateVariable(eVK_Undefined);
             CUTF16String ukey;
             CUTF16String uvalue;
             json_wconv(_key, &ukey);
@@ -290,9 +290,12 @@ bool ob_get_a(PA_ObjectRef obj, const wchar_t *_key, CUTF8String *value) {
         
         if(is_defined)
         {
+            is_defined = false;
             PA_Variable v = PA_GetObjectProperty(obj, &key);
-            if(PA_GetVariableKind(v) == eVK_Unistring)
+            PA_ErrorCode err = PA_GetLastError();
+            if(err == eER_NoErr && PA_GetVariableKind(v) == eVK_Unistring)
             {
+                is_defined = true;
                 PA_Unistring uvalue = PA_GetStringVariable(v);
                 
                 CUTF16String u = CUTF16String(uvalue.fString, uvalue.fLength);
@@ -329,6 +332,7 @@ bool ob_get_a(PA_ObjectRef obj, const wchar_t *_key, CUTF8String *value) {
                 }
 #endif
             }
+            if(err == eER_NoErr) PA_ClearVariable(&v);
         }
         
         PA_DisposeUnistring(&key);
@@ -350,10 +354,12 @@ bool ob_get_b(PA_ObjectRef obj, const wchar_t *_key) {
         if(PA_HasObjectProperty(obj, &key))
         {
             PA_Variable v = PA_GetObjectProperty(obj, &key);
-            if(PA_GetVariableKind(v) == eVK_Boolean)
+            PA_ErrorCode err = PA_GetLastError();
+            if(err == eER_NoErr && PA_GetVariableKind(v) == eVK_Boolean)
             {
                 value = PA_GetBooleanVariable(v);
             }
+            if(err == eER_NoErr) PA_ClearVariable(&v);
         }
         
         PA_DisposeUnistring(&key);
@@ -375,10 +381,12 @@ double ob_get_n(PA_ObjectRef obj, const wchar_t *_key) {
         if(PA_HasObjectProperty(obj, &key))
         {
             PA_Variable v = PA_GetObjectProperty(obj, &key);
-            if(PA_GetVariableKind(v) == eVK_Real)
+            PA_ErrorCode err = PA_GetLastError();
+            if(err == eER_NoErr && PA_GetVariableKind(v) == eVK_Real)
             {
                 value = PA_GetRealVariable(v);
             }
+            if(err == eER_NoErr) PA_ClearVariable(&v);
         }
         
         PA_DisposeUnistring(&key);
@@ -400,10 +408,13 @@ PA_CollectionRef ob_get_c(PA_ObjectRef obj, const wchar_t *_key) {
         if(PA_HasObjectProperty(obj, &key))
         {
             PA_Variable v = PA_GetObjectProperty(obj, &key);
-            if(PA_GetVariableKind(v) == eVK_Collection)
+            PA_ErrorCode err = PA_GetLastError();
+            if(err == eER_NoErr && PA_GetVariableKind(v) == eVK_Collection)
             {
+                // Borrowed: the parent object keeps the collection alive.
                 value = PA_GetCollectionVariable(v);
             }
+            if(err == eER_NoErr) PA_ClearVariable(&v);
         }
         
         PA_DisposeUnistring(&key);
@@ -419,7 +430,11 @@ void ob_stringify(PA_ObjectRef obj, CUTF8String *value) {
     _params[0] = PA_CreateVariable(eVK_Object);
     PA_SetObjectVariable(&_params[0], PA_DuplicateObject(obj));
     PA_Variable vjson = PA_ExecuteCommandByID( /*JSON Stringify */1217, _params, 1);
+    PA_ErrorCode err = PA_GetLastError();
     PA_ClearVariable(&_params[0]);
+    
+    // On error the result is uninitialised: neither read nor clear it.
+    if(err != eER_NoErr) return;
     
     if(PA_GetVariableKind(vjson) != eVK_Unistring)
     {

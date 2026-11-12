@@ -52,6 +52,32 @@ struct TidyRunGuard
     }
 };
 
+// Applies each text element of the `key` collection in `options` to the
+// tags option `option`. PA_GetCollectionElement returns an owned copy that
+// must be cleared -- unless the call failed, in which case the result is
+// uninitialised and must be neither read nor cleared.
+static void set_tags_option(TidyDoc tdoc, PA_ObjectRef options, const wchar_t *key, TidyOptionId option)
+{
+    if(!options || !ob_is_defined(options, key)) return;
+
+    PA_CollectionRef tags = ob_get_c(options, key);
+    if(!tags) return;
+
+    for(PA_long32 i = 0; i < PA_GetCollectionLength(tags); ++i) {
+        PA_Variable v = PA_GetCollectionElement(tags, i);
+        if(PA_GetLastError() != eER_NoErr) continue;
+        if(PA_GetVariableKind(v) == eVK_Unistring) {
+            PA_Unistring ustr = PA_GetStringVariable(v);
+            C_TEXT t;
+            t.setUTF16String(&ustr);
+            CUTF8String u8;
+            t.copyUTF8String(&u8);
+            tidyOptSetValue(tdoc, option, (ctmbstr)u8.c_str());
+        }
+        PA_ClearVariable(&v);
+    }
+}
+
 void PluginMain(PA_long32 selector, PA_PluginParameters params) {
     
 	try
@@ -126,74 +152,10 @@ void Tidy(PA_PluginParameters params) {
         {
             tidyOptSetBool(tdoc, TidyAsciiChars, (Bool)ob_get_b(options, L"asciiChars"));
         }
-        if(options && ob_is_defined(options, L"blockTags"))
-        {
-            PA_CollectionRef tags = ob_get_c(options, L"blockTags");
-            if(tags) {
-                for(PA_long32 i =0; i < PA_GetCollectionLength(tags); ++i) {
-                    PA_Variable v = PA_GetCollectionElement(tags, i);
-                    if(PA_GetVariableKind(v) == eVK_Unistring) {
-                        PA_Unistring ustr = PA_GetStringVariable(v);
-                        C_TEXT t;
-                        t.setUTF16String(&ustr);
-                        CUTF8String u8;
-                        t.copyUTF8String(&u8);
-                        tidyOptSetValue(tdoc, TidyBlockTags, (ctmbstr)u8.c_str());
-                    }
-                }
-            }
-        }
-        if(options && ob_is_defined(options, L"emptyTags"))
-        {
-            PA_CollectionRef tags = ob_get_c(options, L"emptyTags");
-            if(tags) {
-                for(PA_long32 i =0; i < PA_GetCollectionLength(tags); ++i) {
-                    PA_Variable v = PA_GetCollectionElement(tags, i);
-                    if(PA_GetVariableKind(v) == eVK_Unistring) {
-                        PA_Unistring ustr = PA_GetStringVariable(v);
-                        C_TEXT t;
-                        t.setUTF16String(&ustr);
-                        CUTF8String u8;
-                        t.copyUTF8String(&u8);
-                        tidyOptSetValue(tdoc, TidyEmptyTags, (ctmbstr)u8.c_str());
-                    }
-                }
-            }
-        }
-        if(options && ob_is_defined(options, L"inlineTags"))
-        {
-            PA_CollectionRef tags = ob_get_c(options, L"inlineTags");
-            if(tags) {
-                for(PA_long32 i =0; i < PA_GetCollectionLength(tags); ++i) {
-                    PA_Variable v = PA_GetCollectionElement(tags, i);
-                    if(PA_GetVariableKind(v) == eVK_Unistring) {
-                        PA_Unistring ustr = PA_GetStringVariable(v);
-                        C_TEXT t;
-                        t.setUTF16String(&ustr);
-                        CUTF8String u8;
-                        t.copyUTF8String(&u8);
-                        tidyOptSetValue(tdoc, TidyInlineTags, (ctmbstr)u8.c_str());
-                    }
-                }
-            }
-        }
-        if(options && ob_is_defined(options, L"preTags"))
-        {
-            PA_CollectionRef tags = ob_get_c(options, L"preTags");
-            if(tags) {
-                for(PA_long32 i =0; i < PA_GetCollectionLength(tags); ++i) {
-                    PA_Variable v = PA_GetCollectionElement(tags, i);
-                    if(PA_GetVariableKind(v) == eVK_Unistring) {
-                        PA_Unistring ustr = PA_GetStringVariable(v);
-                        C_TEXT t;
-                        t.setUTF16String(&ustr);
-                        CUTF8String u8;
-                        t.copyUTF8String(&u8);
-                        tidyOptSetValue(tdoc, TidyPreTags, (ctmbstr)u8.c_str());
-                    }
-                }
-            }
-        }
+        set_tags_option(tdoc, options, L"blockTags", TidyBlockTags);
+        set_tags_option(tdoc, options, L"emptyTags", TidyEmptyTags);
+        set_tags_option(tdoc, options, L"inlineTags", TidyInlineTags);
+        set_tags_option(tdoc, options, L"preTags", TidyPreTags);
         if(options && ob_is_defined(options, L"bodyOnly"))
         {
             tidyOptSetBool(tdoc, TidyBodyOnly, (Bool)ob_get_b(options, L"bodyOnly"));
